@@ -26,16 +26,37 @@ function Get-PlaybookParams
     $Help = $Help.Where({$_ -match '^options:'}, 'SkipUntil') -ne "" -notmatch '^(  )?\w' | Out-String
     $Blocks = $Help.Trim() -split "`n  (?=-)"
 
+    $SingleLetterAliases = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+
     $Params = $Blocks | ForEach-Object {
         $Aliases, $Help = $_ -split "(?s)\s{2,}"
         $Aliases = $Aliases -split ", "
         $Help = $Help -join " "
 
+        if ($Aliases -match '-verbose') {return}  # special case!
+
         $Arg = ""
         $Aliases = $Aliases | ForEach-Object {$Alias, $Arg = $_ -split " "; $Alias}
+
+        $SingleLetterAlias = @($Aliases) -match '^-\w$' -replace '-'
+
+        if ($SingleLetterAlias -and -not $SingleLetterAliases.Add($SingleLetterAlias))
+        {
+            # we have a case-insensitive duplicate :-(
+            $Aliases = @($Aliases) -notmatch '^-\w$'
+        }
+
         $Name = @($Aliases) -match '^--' | Select-Object -First 1
-        $Aliases = ($Name, (@($Aliases) -ne $Name) | Write-Output) -replace '^--?'
-        $Name = $Name -replace '^--?' | ToTitleCase
+        $Aliases = @($Aliases) -ne $Name
+
+        if ($Name -match '\w-\w')
+        {
+            $Aliases = $Name, $Aliases | Write-Output
+        }
+
+        $Name = ($Name | ToTitleCase) -replace '-'
+        $Aliases = @($Aliases) -replace '^--?'
+
 
         $Type = if (-not $Arg)
         {
@@ -51,7 +72,10 @@ function Get-PlaybookParams
         }
 
         $Attrs = [Collections.ObjectModel.Collection[Attribute]]::new()
-        $Attrs.Add([Alias]::new($Aliases))
+        if ($Aliases)
+        {
+            $Attrs.Add([Alias]::new($Aliases))
+        }
         $ParamAttr = [ParameterAttribute]::new()
         $ParamAttr.HelpMessage = $Help
         $Attrs.Add($ParamAttr)
