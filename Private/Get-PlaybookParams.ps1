@@ -26,6 +26,7 @@ function Get-PlaybookParams
     $Help = $Help.Where({$_ -match '^options:'}, 'SkipUntil') -ne "" -notmatch '^(  )?\w' | Out-String
     $Blocks = $Help.Trim() -split "`n  (?=-)"
 
+    [string[]]$Aliases = $null
     $SingleLetterAliases = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
 
     $Params = $Blocks | ForEach-Object {
@@ -38,8 +39,8 @@ function Get-PlaybookParams
         $Arg = ""
         $Aliases = $Aliases | ForEach-Object {$Alias, $Arg = $_ -split " "; $Alias}
 
+        # Assumption: there's no more than one single-letter alias
         $SingleLetterAlias = @($Aliases) -match '^-\w$' -replace '-'
-
         if ($SingleLetterAlias -and -not $SingleLetterAliases.Add($SingleLetterAlias))
         {
             # we have a case-insensitive duplicate :-(

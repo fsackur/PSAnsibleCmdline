@@ -1,32 +1,72 @@
 function Invoke-AnsiblePlaybook
 {
+    <#
+
+    #>
+
+    [CmdletBinding()]
     param
     (
         [Parameter(Mandatory, Position = 0)]
-        [string]$Playbook
+        [string]$Playbook,
+
+        [Alias('vv', 'vvv', 'vvvv', 'vvvvv')]
+        [switch]$v
     )
 
     dynamicparam
     {
-        return Get-PlaybookParams
+        $DynParams = Get-PlaybookParams
+        $DynParams
     }
 
     end
     {
-        [void]$PSBoundParameters.Remove("Playbook")
-        $Script:CommonParameters | ForEach-Object {[void]$PSBoundParameters.Remove($_)}
+        $Verbosity = if ($v -or $VerbosePreference -notin ('SilentlyContinue', 'Ignore'))
+        {
+            if ($MyInvocation.Line -match '\s-(v*)(\s|$)') {$Matches[1].Length} else {3}
+        }
 
-        [string[]]$PlaybookArgs = @()
+        $PlaybookArgs = [Collections.Generic.List[string]]::new()
+        $PSBoundParameters.GetEnumerator() |
+            ForEach-Object {
+                $Param = $DynParams[$_.Key]
+                if (-not $Param) {return}  # filter out static and common params
 
-        $PlaybookArgs += $PSBoundParameters.GetEnumerator() |
-            Where-Object {$_.Value -isnot [switch]} |
-            ForEach-Object {"--$($_.Key)", "$($_.Value)"}
+                $PSName = $_.Key
+                $Aliases = $Param.Attributes.AliasNames
+                $Name = $Aliases | Where-Object {$_ -replace '-' -ilike $PSName} | Select-Object -First 1
+                if (-not $Name) {$Name = $PSName.ToLower()}
 
-        $PlaybookArgs += $PSBoundParameters.GetEnumerator() |
-            Where-Object {$_.Value -is [switch] -and $_.Value} |
-            ForEach-Object {"--$($_.Key)"}
+                if ($Param.ParameterType -eq [switch])
+                {
+                    $PlaybookArgs.Add("--$Name")
+                }
+                else
+                {
+                    $PlaybookArgs.Add("--$Name")
+                    $PlaybookArgs.Add("$($_.Value)")
+                }
+            }
 
-        ansible-playbook $PlaybookArgs $Playbook
+        if ($Verbosity)
+        {
+            $PlaybookArgs.Add("-$('v' * $Verbosity)")
+        }
+
+        try
+        {
+            $ANSIBLE_DEBUG = $env:ANSIBLE_DEBUG
+            if ($DebugPreference -notin ('SilentlyContinue', 'Ignore')) {$env:ANSIBLE_DEBUG = 1}
+
+            if ($Verbosity) {$VerbosePreference = 'Continue'}
+            Write-Verbose "ansible-playbook $PlaybookArgs $Playbook"
+            ansible-playbook $PlaybookArgs $Playbook
+        }
+        finally
+        {
+            $env:ANSIBLE_DEBUG = $ANSIBLE_DEBUG
+        }
     }
 }
 
