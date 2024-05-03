@@ -2,7 +2,8 @@ using namespace System.Management.Automation
 
 function ToTitleCase
 {
-    param (
+    param
+    (
         [Parameter(Mandatory, Position = 0, ValueFromPipeline)]
         [string]$String
     )
@@ -17,6 +18,8 @@ function ToTitleCase
 
 function Get-PlaybookParams
 {
+    [Diagnostics.CodeAnalysis.SuppressMessage("PSUseSingularNouns", "")]
+    [OutputType([RuntimeDefinedParameterDictionary])]
     [CmdletBinding()]
     param ()
 

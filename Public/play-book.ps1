@@ -1,3 +1,6 @@
+[Diagnostics.CodeAnalysis.SuppressMessage("PSReviewUnusedParameter", "")]
+param ()
+
 function Invoke-AnsiblePlaybook
 {
     [CmdletBinding()]
